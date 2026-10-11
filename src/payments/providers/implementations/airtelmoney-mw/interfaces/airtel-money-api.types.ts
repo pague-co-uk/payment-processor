@@ -1,14 +1,24 @@
+export type AirtelMoneyTransactionStatus =
+  | "TF"
+  | "TS"
+  | "TA"
+  | "TIP"
+  | "TE";
+
+
 export interface AirtelMoneyAuthRequest {
   client_id: string;
   client_secret: string;
   grant_type: "client_credentials";
 }
 
+
 export interface AirtelMoneyAuthResponse {
   access_token: string;
   token_type?: string;
   expires_in?: number;
 }
+
 
 export interface AirtelMoneyPaymentRequest {
   reference: string;
@@ -27,7 +37,40 @@ export interface AirtelMoneyPaymentRequest {
   };
 }
 
+
 export interface AirtelMoneyPaymentResponse {
-  data?: Record<string, unknown>;
-  status?: Record<string, unknown>;
+  data?: {
+    transaction?: {
+      id?: string;
+      status?: string;
+    };
+  };
+
+  status?: {
+    code?: string;
+    message?: string;
+    result_code?: string;
+    response_code?: string;
+    success?: boolean;
+  };
+}
+
+
+export interface AirtelMoneyPaymentStatusResponse {
+  data: {
+    transaction: {
+      airtel_money_id?: string;
+      id: string;
+      message: string;
+      status: AirtelMoneyTransactionStatus;
+    };
+  };
+
+  status: {
+    code: string;
+    message: string;
+    result_code?: string;
+    response_code: string;
+    success: boolean;
+  };
 }

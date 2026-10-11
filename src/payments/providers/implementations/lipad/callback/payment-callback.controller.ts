@@ -8,7 +8,7 @@ import { LipadPaymentCallbackService } from "./lipad-payment-callback.service.js
 
 
 @Controller("payments")
-export class PaymentCallbackController {
+export class LipadPaymentCallbackController {
   constructor(
     private readonly callbackService:
       LipadPaymentCallbackService,
@@ -22,9 +22,6 @@ export class PaymentCallbackController {
     @Headers()
     headers: Record<string, string>,
   ) {
-    return this.callbackService.handle(
-      payload,
-      headers,
-    );
+    return this.callbackService.handle(payload, headers);
   }
 }

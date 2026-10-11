@@ -18,9 +18,11 @@ import { PaymentProviderRegistry } from "./providers/core/payment-provider.regis
 import { AirtelMoneyClient } from "./providers/implementations/airtelmoney-mw/airtel-money-mw.client.js";
 import { AirtelMoneyMapper } from "./providers/implementations/airtelmoney-mw/airtel-money-mw.mapper.js";
 import { AirtelMoneyProvider } from "./providers/implementations/airtelmoney-mw/airtel-money-mw.provider.js";
+import { AirtelMoneyPaymentCallbackController } from "./providers/implementations/airtelmoney-mw/callback/airtel-money-payment-callback.controller.js";
+import { AirtelMoneyPaymentCallbackService } from "./providers/implementations/airtelmoney-mw/callback/airtel-money-payment-callback.service.js";
 import { AirtelMoneyAuthService } from "./providers/implementations/airtelmoney-mw/services/airtel-money-auth.service.js";
 import { LipadPaymentCallbackService } from "./providers/implementations/lipad/callback/lipad-payment-callback.service.js";
-import { PaymentCallbackController } from "./providers/implementations/lipad/callback/payment-callback.controller.js";
+import { LipadPaymentCallbackController } from "./providers/implementations/lipad/callback/payment-callback.controller.js";
 import { LipadOtpController } from "./providers/implementations/lipad/direct-charge/controllers/lipad-otp.controller.js";
 import { LipadDirectChargeClient } from "./providers/implementations/lipad/direct-charge/lipad-direct-charge.client.js";
 import { LipadDirectChargeMapper } from "./providers/implementations/lipad/direct-charge/lipad-direct-charge.mapper.js";
@@ -58,11 +60,13 @@ import {
     AirtelMoneyProvider,
     AirtelMoneyClient,
     AirtelMoneyMapper,
-    AirtelMoneyAuthService
+    AirtelMoneyAuthService,
+    AirtelMoneyPaymentCallbackService,
   ],
   controllers: [
-    PaymentCallbackController,
     LipadOtpController,
+    AirtelMoneyPaymentCallbackController,
+    LipadPaymentCallbackController,
   ],
   exports: [
     PaymentProviderRegistry,

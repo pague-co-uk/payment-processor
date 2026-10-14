@@ -33,7 +33,7 @@ export class AirtelMoneyMapper {
 
     return {
       reference:
-        transaction.reference,
+        transaction.publicId,
 
       subscriber: {
         country,

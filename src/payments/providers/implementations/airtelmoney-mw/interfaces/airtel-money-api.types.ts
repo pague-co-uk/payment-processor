@@ -57,6 +57,14 @@ export interface AirtelMoneyPaymentResponse {
 
 
 export interface AirtelMoneyPaymentStatusResponse {
+  status: {
+    response_code: string;
+    code: string;
+    success: boolean;
+    result_code: string;
+    message: string;
+  };
+
   data: {
     transaction: {
       airtel_money_id?: string;
@@ -64,13 +72,5 @@ export interface AirtelMoneyPaymentStatusResponse {
       message: string;
       status: AirtelMoneyTransactionStatus;
     };
-  };
-
-  status: {
-    code: string;
-    message: string;
-    result_code?: string;
-    response_code: string;
-    success: boolean;
   };
 }

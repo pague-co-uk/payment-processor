@@ -27,10 +27,76 @@ import type {
   AirtelMoneyPaymentStatusResponse,
 } from "./interfaces/airtel-money-api.types.js";
 
+/**
+ * The subset of Airtel's response structure used to normalize
+ * provider errors into the gateway's standard exception fields.
+ */
+interface AirtelMoneyProviderStatus {
+  response_code?: unknown;
+  code?: unknown;
+  success?: unknown;
+  result_code?: unknown;
+  message?: unknown;
+}
+
+interface AirtelMoneyProviderErrorDetails {
+  providerCode?: string;
+  providerMessage?: string;
+}
+
+/**
+ * Safely checks whether a value is a non-null object.
+ */
+function isRecord(
+  value: unknown,
+): value is Record<string, unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    !Array.isArray(value)
+  );
+}
+
+/**
+ * Extracts gateway-standard error details from an Airtel response.
+ *
+ * Airtel-specific response parsing stays inside this client.
+ * Downstream services should consume providerCode, providerMessage,
+ * providerResponse and retryable from PaymentProviderException.
+ */
+function extractProviderError(
+  body: unknown,
+): AirtelMoneyProviderErrorDetails {
+  if (!isRecord(body) || !isRecord(body.status)) {
+    return {};
+  }
+
+  const status =
+    body.status as AirtelMoneyProviderStatus;
+
+  const providerCode =
+    typeof status.response_code === "string"
+      ? status.response_code
+      : typeof status.result_code === "string"
+        ? status.result_code
+        : typeof status.code === "string"
+          ? status.code
+          : undefined;
+
+  const providerMessage =
+    typeof status.message === "string" &&
+      status.message.trim().length > 0
+      ? status.message.trim()
+      : undefined;
+
+  return {
+    providerCode,
+    providerMessage,
+  };
+}
 
 @Injectable()
 export class AirtelMoneyClient {
-
   private readonly logger =
     getComponentLogger(
       "airtel-money-client",
@@ -58,7 +124,6 @@ export class AirtelMoneyClient {
       unit: "ms",
     });
 
-
   constructor(
     private readonly config:
       AppConfigService,
@@ -67,15 +132,12 @@ export class AirtelMoneyClient {
       AirtelMoneyAuthService,
   ) { }
 
-
   public async initiatePayment(
     request: AirtelMoneyPaymentRequest,
   ): Promise<AirtelMoneyPaymentResponse> {
-
     return withPromiseSpan(
       "Airtel Money Initiate Payment",
       async (span) => {
-
         const token =
           await this.auth.getAccessToken();
 
@@ -96,18 +158,13 @@ export class AirtelMoneyClient {
         return this.post(
           "/merchant/v1/payments/",
           {
-            Accept:
-              "*/*",
-
+            Accept: "*/*",
             "Content-Type":
               "application/json",
-
             "X-Country":
               request.subscriber.country,
-
             "X-Currency":
               request.subscriber.currency,
-
             Authorization:
               `Bearer ${token}`,
           },
@@ -117,17 +174,14 @@ export class AirtelMoneyClient {
     );
   }
 
-
   public async getPaymentStatus(
     transactionId: string,
     country: string,
     currency: string,
   ): Promise<AirtelMoneyPaymentStatusResponse> {
-
     return withPromiseSpan(
       "Airtel Money Transaction Enquiry",
       async (span) => {
-
         const token =
           await this.auth.getAccessToken();
 
@@ -148,15 +202,9 @@ export class AirtelMoneyClient {
         return this.get(
           `/standard/v1/payments/${encodeURIComponent(transactionId)}`,
           {
-            Accept:
-              "*/*",
-
-            "X-Country":
-              country,
-
-            "X-Currency":
-              currency,
-
+            Accept: "*/*",
+            "X-Country": country,
+            "X-Currency": currency,
             Authorization:
               `Bearer ${token}`,
           },
@@ -165,13 +213,11 @@ export class AirtelMoneyClient {
     );
   }
 
-
   private async post(
     path: string,
     headers: Record<string, string>,
     request: AirtelMoneyPaymentRequest,
   ): Promise<AirtelMoneyPaymentResponse> {
-
     const url =
       `${this.config.airtelMoney.baseUrl}${path}`;
 
@@ -179,17 +225,13 @@ export class AirtelMoneyClient {
       Date.now();
 
     this.paymentRequests.increment({
-      provider:
-        "airtel-money",
-
-      operation:
-        "initiate",
+      provider: "airtel-money",
+      operation: "initiate",
     });
 
     let response: Response;
 
     try {
-
       this.logger.debug(
         {
           path,
@@ -202,18 +244,12 @@ export class AirtelMoneyClient {
         await fetch(
           url,
           {
-            method:
-              "POST",
-
+            method: "POST",
             headers: {
               ...headers,
             },
-
             body:
-              JSON.stringify(
-                request,
-              ),
-
+              JSON.stringify(request),
             signal:
               AbortSignal.timeout(
                 this.config
@@ -222,9 +258,7 @@ export class AirtelMoneyClient {
               ),
           },
         );
-
     } catch (error) {
-
       this.recordFailure(
         "initiate",
         "transport_error",
@@ -264,12 +298,10 @@ export class AirtelMoneyClient {
     );
   }
 
-
   private async get(
     path: string,
     headers: Record<string, string>,
   ): Promise<AirtelMoneyPaymentStatusResponse> {
-
     const url =
       `${this.config.airtelMoney.baseUrl}${path}`;
 
@@ -277,17 +309,13 @@ export class AirtelMoneyClient {
       Date.now();
 
     this.paymentRequests.increment({
-      provider:
-        "airtel-money",
-
-      operation:
-        "status",
+      provider: "airtel-money",
+      operation: "status",
     });
 
     let response: Response;
 
     try {
-
       this.logger.debug(
         {
           path,
@@ -300,13 +328,10 @@ export class AirtelMoneyClient {
         await fetch(
           url,
           {
-            method:
-              "GET",
-
+            method: "GET",
             headers: {
               ...headers,
             },
-
             signal:
               AbortSignal.timeout(
                 this.config
@@ -315,9 +340,7 @@ export class AirtelMoneyClient {
               ),
           },
         );
-
     } catch (error) {
-
       this.recordFailure(
         "status",
         "transport_error",
@@ -357,15 +380,26 @@ export class AirtelMoneyClient {
     let body: unknown;
 
     try {
-
       body =
         responseText
-          ? JSON.parse(
-            responseText,
-          )
+          ? JSON.parse(responseText)
           : undefined;
-
     } catch (error) {
+      /*
+       * When the HTTP status already indicates failure,
+       * preserve that failure and the raw response.
+       * Invalid JSON must not hide the HTTP error.
+       */
+      if (!response.ok) {
+        this.throwHttpError(
+          response,
+          responseText,
+          "status",
+          path,
+          "GET",
+          error,
+        );
+      }
 
       this.recordFailure(
         "status",
@@ -376,8 +410,7 @@ export class AirtelMoneyClient {
         {
           path,
           method: "GET",
-          httpStatus:
-            response.status,
+          httpStatus: response.status,
           err: error,
         },
         "Airtel Money transaction enquiry response was not valid JSON.",
@@ -387,53 +420,25 @@ export class AirtelMoneyClient {
         "Airtel Money transaction enquiry response was not valid JSON.",
         {
           retryable: false,
+          providerResponse: responseText,
           cause: error,
         },
       );
     }
 
-
     if (!response.ok) {
-
-      const retryable =
-        response.status >= 500 &&
-        response.status <= 599;
-
-      this.recordFailure(
+      this.throwHttpError(
+        response,
+        body ?? responseText,
         "status",
-        retryable
-          ? "provider_server_error"
-          : "provider_http_error",
-      );
-
-      this.logger.error(
-        {
-          path,
-          method: "GET",
-          httpStatus:
-            response.status,
-          retryable,
-        },
-        "Airtel Money transaction enquiry returned an HTTP error.",
-      );
-
-      throw new PaymentProviderException(
-        `Airtel Money transaction enquiry failed with HTTP ${response.status}.`,
-        {
-          retryable,
-          providerResponse:
-            body ?? responseText,
-        },
+        path,
+        "GET",
       );
     }
 
-
     if (
-      !body ||
-      typeof body !== "object" ||
-      Array.isArray(body)
+      !isRecord(body)
     ) {
-
       this.recordFailure(
         "status",
         "invalid_response",
@@ -449,26 +454,23 @@ export class AirtelMoneyClient {
       );
     }
 
-
     const statusResponse =
-      body as AirtelMoneyPaymentStatusResponse;
-
+      body as unknown as AirtelMoneyPaymentStatusResponse;
 
     /*
-     * status.success describes whether the
-     * transaction enquiry API request itself
-     * succeeded.
+     * status.success describes whether the transaction enquiry
+     * API request itself succeeded.
      *
-     * It does NOT represent the payment
-     * transaction state.
-     *
-     * The actual transaction state is:
-     *
-     * data.transaction.status
+     * It does NOT represent the payment transaction state.
+     * The actual transaction state is data.transaction.status.
      */
     if (
       statusResponse.status.success === false
     ) {
+      const {
+        providerCode,
+        providerMessage,
+      } = extractProviderError(body);
 
       this.recordFailure(
         "status",
@@ -479,57 +481,34 @@ export class AirtelMoneyClient {
         {
           path,
           method: "GET",
-          httpStatus:
-            response.status,
-
-          providerResponseCode:
-            statusResponse
-              .status
-              .response_code,
-
-          providerResultCode:
-            statusResponse
-              .status
-              .result_code,
+          httpStatus: response.status,
+          providerCode,
+          providerMessage,
         },
         "Airtel Money transaction enquiry was rejected by the provider.",
       );
 
       throw new PaymentProviderException(
-        statusResponse.status.message ||
+        providerMessage ??
         "Airtel Money transaction enquiry was rejected by the provider.",
         {
           retryable: false,
-
-          providerCode:
-            statusResponse
-              .status
-              .response_code,
-
-          providerMessage:
-            statusResponse
-              .status
-              .message,
-
-          providerResponse:
-            statusResponse,
+          providerCode,
+          providerMessage,
+          providerResponse: body,
         },
       );
     }
 
-
     this.logger.debug(
       {
         path,
-        httpStatus:
-          response.status,
-
+        httpStatus: response.status,
         transactionStatus:
           statusResponse
             .data
             .transaction
             .status,
-
         providerResponseCode:
           statusResponse
             .status
@@ -538,31 +517,39 @@ export class AirtelMoneyClient {
       "Airtel Money transaction enquiry completed successfully.",
     );
 
-
     return statusResponse;
   }
-
 
   private async parsePaymentResponse(
     response: Response,
     path: string,
   ): Promise<AirtelMoneyPaymentResponse> {
-
     const responseText =
       await response.text();
 
     let body: unknown;
 
     try {
-
       body =
         responseText
-          ? JSON.parse(
-            responseText,
-          )
+          ? JSON.parse(responseText)
           : undefined;
-
     } catch (error) {
+      /*
+       * If Airtel returned a non-2xx response with a non-JSON body,
+       * preserve the HTTP failure and raw body instead of masking
+       * it as a JSON parsing failure.
+       */
+      if (!response.ok) {
+        this.throwHttpError(
+          response,
+          responseText,
+          "initiate",
+          path,
+          "POST",
+          error,
+        );
+      }
 
       this.recordFailure(
         "initiate",
@@ -573,8 +560,7 @@ export class AirtelMoneyClient {
         {
           path,
           method: "POST",
-          httpStatus:
-            response.status,
+          httpStatus: response.status,
           err: error,
         },
         "Airtel Money payment response was not valid JSON.",
@@ -584,54 +570,25 @@ export class AirtelMoneyClient {
         "Airtel Money payment response was not valid JSON.",
         {
           retryable: false,
+          providerResponse: responseText,
           cause: error,
         },
       );
     }
 
-
     if (!response.ok) {
-
-      const retryable =
-        response.status >= 500 &&
-        response.status <= 599;
-
-      this.recordFailure(
+      this.throwHttpError(
+        response,
+        body ?? responseText,
         "initiate",
-        retryable
-          ? "provider_server_error"
-          : "provider_http_error",
-      );
-
-      this.logger.error(
-        {
-          path,
-          method: "POST",
-          httpStatus:
-            response.status,
-          retryable,
-        },
-        "Airtel Money payment request returned an HTTP error.",
-      );
-
-      throw new PaymentProviderException(
-        `Airtel Money payment request failed with HTTP ${response.status}.`,
-        {
-          retryable,
-
-          providerResponse:
-            body ?? responseText,
-        },
+        path,
+        "POST",
       );
     }
 
-
     if (
-      !body ||
-      typeof body !== "object" ||
-      Array.isArray(body)
+      !isRecord(body)
     ) {
-
       this.recordFailure(
         "initiate",
         "invalid_response",
@@ -641,45 +598,97 @@ export class AirtelMoneyClient {
         "Airtel Money payment response was invalid.",
         {
           retryable: false,
-
           providerResponse:
             body ?? responseText,
         },
       );
     }
 
-
     return body as AirtelMoneyPaymentResponse;
   }
 
+  /**
+   * Converts an Airtel HTTP failure into the gateway's standard
+   * PaymentProviderException contract.
+   *
+   * providerCode and providerMessage are extracted here, at the
+   * provider boundary. Downstream services do not need to inspect
+   * Airtel's response schema.
+   */
+  private throwHttpError(
+    response: Response,
+    providerResponse: unknown,
+    operation: "initiate" | "status",
+    path: string,
+    method: "GET" | "POST",
+    cause?: unknown,
+  ): never {
+    const retryable =
+      response.status >= 500 &&
+      response.status <= 599;
+
+    const {
+      providerCode,
+      providerMessage,
+    } = extractProviderError(providerResponse);
+
+    const message =
+      providerMessage ??
+      `Airtel Money ${operation === "initiate" ? "payment request" : "transaction enquiry"} failed with HTTP ${response.status}.`;
+
+    this.recordFailure(
+      operation,
+      retryable
+        ? "provider_server_error"
+        : "provider_http_error",
+    );
+
+    this.logger.error(
+      {
+        path,
+        method,
+        httpStatus: response.status,
+        providerCode,
+        providerMessage,
+        retryable,
+        ...(cause ? { err: cause } : {}),
+      },
+      operation === "initiate"
+        ? "Airtel Money payment request failed."
+        : "Airtel Money transaction enquiry failed.",
+    );
+
+    throw new PaymentProviderException(
+      message,
+      {
+        retryable,
+        providerCode,
+        providerMessage,
+        providerResponse,
+        ...(cause ? { cause } : {}),
+      },
+    );
+  }
 
   private recordFailure(
     operation: "initiate" | "status",
     reason: string,
   ): void {
-
     this.paymentFailures.increment({
-      provider:
-        "airtel-money",
-
+      provider: "airtel-money",
       operation,
-
       reason,
     });
   }
-
 
   private recordDuration(
     startedAt: number,
     operation: "initiate" | "status",
   ): void {
-
     this.paymentDuration.record(
       Date.now() - startedAt,
       {
-        provider:
-          "airtel-money",
-
+        provider: "airtel-money",
         operation,
       },
     );

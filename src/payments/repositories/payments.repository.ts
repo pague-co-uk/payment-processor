@@ -1,3 +1,4 @@
+import { createCounterMetric, recordMetricSafely } from "@pague-co-uk/sms-gateway-telemetry";
 import {
   Prisma,
   PrismaClient,
@@ -37,6 +38,8 @@ export type PaymentTransaction =
 
 export class PaymentsRepository
   extends DatabaseRepository {
+  private readonly outcomes = createCounterMetric({ name: 'payments.processing.outcomes', description: 'Persisted terminal payment states, never provider request success.' });
+
   constructor(
     @Inject(DATABASE)
     db:
@@ -102,7 +105,7 @@ export class PaymentsRepository
       message: string;
     },
   ): Promise<PaymentTransaction | null> {
-    return this.execute(
+    const persisted = await this.execute(
       "UPDATE",
       "transactions",
       async () => {
@@ -162,6 +165,11 @@ export class PaymentsRepository
         };
       },
     );
+    if (persisted && ['SUCCESS', 'FAILED', 'REVERSED', 'CANCELLED'].includes('FAILED')) {
+      recordMetricSafely(() => this.outcomes.increment({ provider: ['AIRTEL_MONEY_MW', 'LIPAD_DIRECT_CHARGE', 'LIPAD_PAYOUTS'].includes(persisted.provider?.code ?? '') ? persisted.provider!.code : 'OTHER', status: 'FAILED' }));
+    }
+    return persisted;
+
   }
 
   public async findTransactionByPublicId(
@@ -342,7 +350,7 @@ export class PaymentsRepository
     status: TransactionStatus,
     providerResponse: Prisma.InputJsonValue,
   ): Promise<PaymentTransaction | null> {
-    return this.execute(
+    const persisted = await this.execute(
       "UPDATE",
       "transactions",
       async () => {
@@ -410,5 +418,10 @@ export class PaymentsRepository
         };
       },
     );
+    if (persisted && ['SUCCESS', 'FAILED', 'REVERSED', 'CANCELLED'].includes(status)) {
+      recordMetricSafely(() => this.outcomes.increment({ provider: ['AIRTEL_MONEY_MW', 'LIPAD_DIRECT_CHARGE', 'LIPAD_PAYOUTS'].includes(persisted.provider?.code ?? '') ? persisted.provider!.code : 'OTHER', status: status }));
+    }
+    return persisted;
+
   }
 }

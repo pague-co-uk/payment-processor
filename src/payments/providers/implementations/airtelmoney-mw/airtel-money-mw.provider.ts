@@ -1,3 +1,4 @@
+import { measureOperation } from "@pague-co-uk/sms-gateway-telemetry";
 import {
   Injectable,
 } from "@nestjs/common";
@@ -76,6 +77,7 @@ export class AirtelMoneyProvider
   public async execute(
     request: PaymentRequest,
   ): Promise<AirtelMoneyPaymentResponse> {
+    return measureOperation('payments.provider.processing', { provider: 'AIRTEL_MONEY_MW', operation: 'execute' }, async () => {
     const transaction = request.transaction;
 
     const paymentRequest =
@@ -120,12 +122,15 @@ export class AirtelMoneyProvider
 
       throw error;
     }
+
+    });
   }
 
 
   public async handleCallback(
     request: PaymentCallbackRequest,
   ): Promise<PaymentCallbackResult> {
+    return measureOperation('payments.provider.processing', { provider: 'AIRTEL_MONEY_MW', operation: 'handleCallback' }, async () => {
     return withPromiseSpan(
       "AirtelMoneyProvider.handleCallback",
       async (span) => {
@@ -344,6 +349,8 @@ export class AirtelMoneyProvider
         }
       },
     );
+
+    });
   }
 
 

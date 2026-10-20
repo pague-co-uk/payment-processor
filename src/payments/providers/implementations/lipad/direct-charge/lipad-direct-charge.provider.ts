@@ -1,3 +1,4 @@
+import { measureOperation } from "@pague-co-uk/sms-gateway-telemetry";
 import { Injectable } from "@nestjs/common";
 import { getComponentLogger } from "@pague-co-uk/sms-gateway-telemetry";
 
@@ -33,6 +34,7 @@ export class LipadDirectChargeProvider
   public async execute(
     request: PaymentRequest,
   ): Promise<LipadDirectChargeResponse> {
+    return measureOperation('payments.provider.processing', { provider: 'LIPAD_DIRECT_CHARGE', operation: 'execute' }, async () => {
     const transaction = request.transaction;
 
     const payload =
@@ -70,11 +72,14 @@ export class LipadDirectChargeProvider
     );
 
     return response;
+
+    });
   }
 
   public async handleCallback(
     request: PaymentCallbackRequest,
   ): Promise<PaymentCallbackResult> {
+    return measureOperation('payments.provider.processing', { provider: 'LIPAD_DIRECT_CHARGE', operation: 'handleCallback' }, async () => {
     const externalReference =
       this.requiredCallbackString(
         request.fields.external_reference,
@@ -141,6 +146,8 @@ export class LipadDirectChargeProvider
     return {
       processed: true,
     };
+
+    });
   }
 
   private mapStatus(

@@ -1,3 +1,4 @@
+import { measureOperation } from "@pague-co-uk/sms-gateway-telemetry";
 import {
   Injectable,
 } from "@nestjs/common";
@@ -60,6 +61,7 @@ export class LipadPayoutsProvider
   public async execute(
     request: PaymentRequest,
   ): Promise<unknown> {
+    return measureOperation('payments.provider.processing', { provider: 'LIPAD_PAYOUTS', operation: 'execute' }, async () => {
     const transaction =
       request.transaction;
 
@@ -158,12 +160,15 @@ export class LipadPayoutsProvider
 
       throw error;
     }
+
+    });
   }
 
 
   public async handleCallback(
     request: PaymentCallbackRequest,
   ): Promise<PaymentCallbackResult> {
+    return measureOperation('payments.provider.processing', { provider: 'LIPAD_PAYOUTS', operation: 'handleCallback' }, async () => {
     const transaction =
       request.transaction;
 
@@ -331,6 +336,8 @@ export class LipadPayoutsProvider
 
       throw error;
     }
+
+    });
   }
 
   private mapPaymentStatus(

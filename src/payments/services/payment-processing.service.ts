@@ -1,3 +1,5 @@
+import { createCounterMetric, recordMetricSafely } from "@pague-co-uk/sms-gateway-telemetry";
+import { measureOperation } from "@pague-co-uk/sms-gateway-telemetry";
 import {
   Injectable,
 } from "@nestjs/common";
@@ -30,6 +32,7 @@ import {
 
 @Injectable()
 export class PaymentProcessingService {
+  private readonly processingFailures = createCounterMetric({ name: 'payments.processing.failures', description: 'Processing errors classified by retry eligibility; not confirmed retry scheduling.' });
   private readonly logger:
     ReturnType<typeof getComponentLogger> =
     getComponentLogger(
@@ -50,6 +53,7 @@ export class PaymentProcessingService {
   public async process(
     transactionId: string,
   ): Promise<unknown> {
+    return measureOperation("payments.processing", { operation: "process" }, async () => {
     const transaction =
       await this.repository
         .findTransactionForProcessing(
@@ -104,6 +108,11 @@ export class PaymentProcessingService {
         request,
       );
     } catch (error) {
+      recordMetricSafely(() => this.processingFailures.increment({
+        provider: ['AIRTEL_MONEY_MW', 'LIPAD_DIRECT_CHARGE', 'LIPAD_PAYOUTS'].includes(providerService.provider.code) ? providerService.provider.code : 'OTHER',
+        reason: error instanceof PaymentProcessingException ? error.reason : 'INTERNAL_ERROR',
+        retryable: error instanceof PaymentProcessingException ? error.retryable : 'unknown',
+      }));
       if (
         error instanceof
         PaymentProcessingException
@@ -154,6 +163,8 @@ export class PaymentProcessingService {
 
       throw error;
     }
+
+    });
   }
 
 }
